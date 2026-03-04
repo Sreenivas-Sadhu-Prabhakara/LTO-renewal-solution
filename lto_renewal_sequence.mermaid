@@ -1,0 +1,154 @@
+sequenceDiagram
+    autonumber
+    
+    actor Driver
+    participant LTO as LTO LTMS Portal
+    participant AI as AI Chatbot
+    participant GovData as Gov Data (PNP/MMDA/DOH)
+    participant TESDA as TESDA/Partners
+    participant DOH as DOH Clinic
+    participant Insurance as Insurance Co.
+
+    %% ====================================================================
+    %% PHASE 1: Pre-Renewal & Awareness (60-90 days prior)
+    %% Color: BLUE (#0066CC) - Notification and Awareness Phase
+    %% ====================================================================
+    rect rgb(200, 220, 255)
+        Note over Driver,Insurance: 📬 PHASE 1: Pre-Renewal & Awareness (60-90 days prior)
+        Note over Driver,AI: Status: BLUE = Notification & Awareness Activities
+    end
+    
+    activate Driver
+    Driver->>LTO: Receives Multi-Channel Reminders
+    rect rgb(220, 235, 255)
+        activate LTO
+        LTO->>Driver: Behavioral Nudges for Expiration & Health
+        deactivate LTO
+        Driver->>LTO: Accesses LTMS Portal
+        activate LTO
+        
+        alt Portal Access Options
+            Driver->>LTO: Standard Access
+            Driver->>LTO: Free Access via Network Providers
+            Driver->>LTO: LGU Kiosks for Free Access
+        end
+        deactivate LTO
+        
+        LTO->>LTO: Renewal Recommendation Engine
+        activate LTO
+        Driver->>AI: Uploads Documents for Validation
+        activate AI
+        AI->>Driver: Pre-check & Digital Document Verification (QR-Code)
+        deactivate AI
+        deactivate LTO
+    end
+    deactivate Driver
+
+    %% ====================================================================
+    %% PHASE 2: Eligibility & Assessment
+    %% Color: GREEN (#00AA00) - Evaluation and Risk Assessment Phase
+    %% ====================================================================
+    rect rgb(200, 255, 220)
+        Note over Driver,Insurance: ✅ PHASE 2: Eligibility & Assessment
+        Note over Driver,AI: Status: GREEN = Evaluation & Risk Assessment Activities
+    end
+    
+    activate Driver
+    activate LTO
+    LTO->>GovData: Automated LTMS Pre-Screening
+    activate GovData
+    GovData->>LTO: Returns Interconnected Gov Data
+    deactivate GovData
+    LTO->>LTO: Demerit & Risk Assessment
+    rect rgb(220, 255, 235)
+        alt Risk Assessment Result
+            rect rgb(200, 255, 200)
+                LTO->>Driver: Low Risk / 0 Demerits
+                Driver->>Driver: Gamified Plain Renewal Pathway
+            end
+            
+            rect rgb(255, 240, 200)
+                LTO->>Driver: Moderate / High Risk
+                alt Reorientation Options
+                    Driver->>TESDA: Partner TESDA Courses
+                    activate TESDA
+                    deactivate TESDA
+                    Driver->>LTO: Scenario/Simulation-based Testing
+                    Driver->>LTO: Annual Micro-learning Modules
+                end
+            end
+        end
+    end
+    deactivate LTO
+    deactivate Driver
+
+    %% ====================================================================
+    %% PHASE 3: Application & Processing
+    %% Color: ORANGE (#FF8800) - Submission and Verification Phase
+    %% ====================================================================
+    rect rgb(255, 230, 200)
+        Note over Driver,Insurance: 📋 PHASE 3: Application & Processing
+        Note over Driver,AI: Status: ORANGE = Submission & Verification Activities
+    end
+    
+    activate Driver
+    activate LTO
+    Driver->>LTO: Simplified Application Submission
+    Driver->>DOH: DOH Clinic Submission
+    activate DOH
+    deactivate DOH
+
+    rect rgb(255, 240, 220)
+        LTO->>Driver: Fee Payment Structure Options
+        alt Payment Options
+            Driver->>LTO: Standard P585 Fee Breakdown
+            Driver->>LTO: Risk-based Fees (Cheaper for Safe Drivers)
+            Driver->>LTO: Waived/Discounted Fees (Early Renewal/Volunteering)
+        end
+
+        LTO->>GovData: Identity & Compliance Verification
+        activate GovData
+        deactivate GovData
+
+        alt Identity Verification Method
+            Driver->>LTO: In-Person with Strict Dress Code
+            Driver->>LTO: Digital ID (LTMS Digital ID)
+            Driver->>LTO: Remote Biometric Capture (OFW)
+        end
+    end
+    deactivate LTO
+    deactivate Driver
+
+    %% ====================================================================
+    %% PHASE 4: Post-Renewal & Incentives
+    %% Color: PURPLE (#9900CC) - Completion and Rewards Phase
+    %% ====================================================================
+    rect rgb(240, 200, 255)
+        Note over Driver,Insurance: 🎉 PHASE 4: Post-Renewal & Incentives
+        Note over Driver,AI: Status: PURPLE = Completion & Rewards Activities
+    end
+    
+    activate LTO
+    LTO->>LTO: Measure E2E Processing Time
+    LTO->>Driver: Issue Plain Renewal Badge
+    activate Driver
+    rect rgb(245, 220, 255)
+        LTO->>Insurance: Share Safe Driver Data
+        activate Insurance
+        Insurance->>Driver: Offer Reduced Insurance Premiums
+        Driver->>Insurance: Accepts Incentive
+        deactivate Insurance
+    end
+    deactivate Driver
+    deactivate LTO
+
+    %% ====================================================================
+    %% LEGEND & DOCUMENTATION
+    %% ====================================================================
+    rect rgb(245, 245, 245)
+        Note over Driver,Insurance: 📖 COLOR LEGEND:
+        Note over Driver,Insurance: 🔵 BLUE (Phase 1) = Notification & Awareness
+        Note over Driver,Insurance: 🟢 GREEN (Phase 2) = Evaluation & Risk Assessment
+        Note over Driver,Insurance: 🟠 ORANGE (Phase 3) = Submission & Verification
+        Note over Driver,Insurance: 🟣 PURPLE (Phase 4) = Completion & Rewards
+    end

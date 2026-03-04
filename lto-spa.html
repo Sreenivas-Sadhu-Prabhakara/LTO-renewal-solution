@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LTO Renewal — Re-engineered Implementation Flow</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    /* ── RESET & TOKENS ─────────────────────────────────────────── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg:        #0a0a0a;
+      --bg2:       #111111;
+      --bg3:       #1a1a1a;
+      --bg4:       #242424;
+      --surface:   #161616;
+      --border:    rgba(255,255,255,0.08);
+      --border2:   rgba(255,255,255,0.14);
+      --text:      #f5f5f5;
+      --text2:     #a0a0a0;
+      --text3:     #666666;
+      --white:     #ffffff;
+
+      --p1:        #3b9eff;
+      --p1-dim:    rgba(59,158,255,0.13);
+      --p1-mid:    rgba(59,158,255,0.25);
+      --p1-glow:   rgba(59,158,255,0.40);
+
+      --p2:        #22c55e;
+      --p2-dim:    rgba(34,197,94,0.13);
+      --p2-mid:    rgba(34,197,94,0.25);
+      --p2-glow:   rgba(34,197,94,0.40);
+
+      --p3:        #f97316;
+      --p3-dim:    rgba(249,115,22,0.13);
+      --p3-mid:    rgba(249,115,22,0.25);
+      --p3-glow:   rgba(249,115,22,0.40);
+
+      --p4:        #a855f7;
+      --p4-dim:    rgba(168,85,247,0.13);
+      --p4-mid:    rgba(168,85,247,0.25);
+      --p4-glow:   rgba(168,85,247,0.40);
+
+      --radius:    10px;
+      --radius-lg: 18px;
+      --tr:        0.25s cubic-bezier(0.4,0,0.2,1);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: var(--bg2); }
+    ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+    /* ── NAV ─────────────────────────────────────────────────────── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+      height: 62px;
+      display: flex; align-items: center;
+      background: rgba(10,10,10,0.80);
+      -webkit-backdrop-filter: blur(20px) saturate(1.6);
+      backdrop-filter: blur(20px) saturate(1.6);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      width: 100%; max-width: 1280px; margin: 0 auto;
+      padding: 0 2rem;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-logo {
+      display: flex; align-items: center; gap: 0.55rem;
+      font-size: 1rem; font-weight: 700; letter-spacing: -0.3px;
+      color: var(--white); text-decoration: none;
+    }
+    .nav-logo-icon {
+      width: 30px; height: 30px;
+      background: linear-gradient(135deg,#3b9eff,#a855f7);
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: 800; color: #fff;
+    }
+    .nav-badge {
+      font-size: 0.7rem; font-weight: 600;
+      padding: 2px 8px; border-radius: 30px;
+      background: var(--bg3); color: var(--text2);
+      border: 1px solid var(--border2);
+      margin-left: 0.5rem;
+    }
+
+    /* ── HERO ────────────────────────────────────────────────────── */
+    .hero {
+      padding: 140px 2rem 70px;
+      text-align: center;
+      background: radial-gradient(ellipse 80% 60% at 50% -5%, rgba(59,158,255,0.10) 0%, transparent 70%);
+    }
+    .hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      font-size: 0.78rem; font-weight: 600; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text2);
+      border: 1px solid var(--border2); border-radius: 30px;
+      padding: 4px 14px; margin-bottom: 1.5rem;
+    }
+    .hero-eyebrow span { width: 6px; height: 6px; border-radius: 50%; background: var(--p1); display: block; }
+    .hero h1 {
+      font-size: clamp(2.2rem, 5vw, 3.8rem);
+      font-weight: 800; letter-spacing: -1.5px; line-height: 1.12;
+      color: var(--white); margin-bottom: 1.2rem;
+    }
+    .hero h1 em { font-style: normal; color: var(--p1); }
+    .hero p {
+      font-size: 1.1rem; color: var(--text2); max-width: 580px; margin: 0 auto 2.5rem;
+      font-weight: 400; line-height: 1.7;
+    }
+    .hero-stats {
+      display: flex; align-items: center; justify-content: center;
+      gap: 2.5rem; flex-wrap: wrap; margin-top: 1rem;
+    }
+    .hero-stat { text-align: center; }
+    .hero-stat .num {
+      display: block; font-size: 1.9rem; font-weight: 800;
+      letter-spacing: -1px; color: var(--white);
+    }
+    .hero-stat .lbl { font-size: 0.78rem; color: var(--text2); font-weight: 500; }
+    .hero-stat-divider { width: 1px; height: 40px; background: var(--border2); }
+
+    /* ── PHASE TABS ─────────────────────────────────────────────── */
+    .tabs-wrap {
+      position: sticky; top: 62px; z-index: 900;
+      background: rgba(10,10,10,0.85);
+      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+    }
+    .tabs {
+      display: flex; align-items: stretch;
+      max-width: 1280px; margin: 0 auto;
+      gap: 0; overflow-x: auto;
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab-btn {
+      display: flex; align-items: center; gap: 0.55rem;
+      padding: 0 1.4rem; height: 52px;
+      font-size: 0.88rem; font-weight: 600;
+      color: var(--text2); background: none; border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer; white-space: nowrap;
+      transition: color var(--tr), border-color var(--tr);
+      flex-shrink: 0;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      flex-shrink: 0; opacity: 0.5; transition: opacity var(--tr);
+    }
+    .tab-btn.active .tab-dot { opacity: 1; }
+    .tab-btn[data-phase="1"] .tab-dot { background: var(--p1); }
+    .tab-btn[data-phase="2"] .tab-dot { background: var(--p2); }
+    .tab-btn[data-phase="3"] .tab-dot { background: var(--p3); }
+    .tab-btn[data-phase="4"] .tab-dot { background: var(--p4); }
+    .tab-btn[data-phase="1"].active { color: var(--p1); border-bottom-color: var(--p1); }
+    .tab-btn[data-phase="2"].active { color: var(--p2); border-bottom-color: var(--p2); }
+    .tab-btn[data-phase="3"].active { color: var(--p3); border-bottom-color: var(--p3); }
+    .tab-btn[data-phase="4"].active { color: var(--p4); border-bottom-color: var(--p4); }
+
+    /* ── PAGE LAYOUT ─────────────────────────────────────────────── */
+    .page { display: none; }
+    .page.active {
+      display: block;
+      animation: fadeUp 0.35s var(--tr) both;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .phase-wrap {
+      max-width: 1280px; margin: 0 auto;
+      padding: 3rem 2rem 5rem;
+    }
+
+    /* ── PHASE HEADER ─────────────────────────────────────────────── */
+    .phase-header {
+      display: flex; align-items: flex-start; gap: 1.4rem;
+      margin-bottom: 2.5rem;
+      padding: 1.8rem 2rem;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+    }
+    .phase-icon {
+      width: 54px; height: 54px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; flex-shrink: 0;
+    }
+    .phase-icon.p1 { background: var(--p1-dim); }
+    .phase-icon.p2 { background: var(--p2-dim); }
+    .phase-icon.p3 { background: var(--p3-dim); }
+    .phase-icon.p4 { background: var(--p4-dim); }
+    .phase-title-block { flex: 1; }
+    .phase-label {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em;
+      text-transform: uppercase; margin-bottom: 0.3rem;
+    }
+    .phase-label.p1 { color: var(--p1); }
+    .phase-label.p2 { color: var(--p2); }
+    .phase-label.p3 { color: var(--p3); }
+    .phase-label.p4 { color: var(--p4); }
+    .phase-header h2 {
+      font-size: 1.5rem; font-weight: 700; letter-spacing: -0.5px;
+      color: var(--white); margin-bottom: 0.4rem;
+    }
+    .phase-header p { font-size: 0.92rem; color: var(--text2); line-height: 1.6; max-width: 680px; }
+    .phase-badge {
+      margin-left: auto; flex-shrink: 0;
+      align-self: flex-start;
+      font-size: 0.75rem; font-weight: 600;
+      padding: 5px 12px; border-radius: 30px;
+      border: 1px solid var(--border2);
+    }
+    .phase-badge.p1 { color: var(--p1); background: var(--p1-dim); border-color: var(--p1-mid); }
+    .phase-badge.p2 { color: var(--p2); background: var(--p2-dim); border-color: var(--p2-mid); }
+    .phase-badge.p3 { color: var(--p3); background: var(--p3-dim); border-color: var(--p3-mid); }
+    .phase-badge.p4 { color: var(--p4); background: var(--p4-dim); border-color: var(--p4-mid); }
+
+    /* ── TWO-COLUMN LAYOUT ──────────────────────────────────────── */
+    .phase-body {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.8rem;
+      align-items: start;
+    }
+    @media (max-width: 860px) {
+      .phase-body { grid-template-columns: 1fr; }
+    }
+
+    /* ── DIAGRAM PANEL ──────────────────────────────────────────── */
+    .diagram-panel {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.2rem;
+      overflow: hidden;
+    }
+    .diagram-panel-title {
+      font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text3);
+      margin-bottom: 1rem; padding-left: 0.2rem;
+    }
+    .diagram-panel svg { width: 100%; height: auto; display: block; }
+
+    /* ── STEPS PANEL ────────────────────────────────────────────── */
+    .steps-panel {
+      display: flex; flex-direction: column; gap: 0.8rem;
+    }
+    .panel-title {
+      font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--text3); margin-bottom: 0.2rem;
+    }
+    .step-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.1rem;
+      display: flex; align-items: flex-start; gap: 0.85rem;
+      transition: border-color var(--tr), background var(--tr);
+      cursor: default;
+    }
+    .step-card:hover { border-color: var(--border2); background: var(--bg3); }
+    .step-num {
+      width: 28px; height: 28px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem; font-weight: 700;
+      flex-shrink: 0; margin-top: 1px;
+    }
+    .step-num.p1 { background: var(--p1-dim); color: var(--p1); }
+    .step-num.p2 { background: var(--p2-dim); color: var(--p2); }
+    .step-num.p3 { background: var(--p3-dim); color: var(--p3); }
+    .step-num.p4 { background: var(--p4-dim); color: var(--p4); }
+    .step-title { font-size: 0.9rem; font-weight: 600; color: var(--text); margin-bottom: 0.2rem; }
+    .step-desc  { font-size: 0.81rem; color: var(--text2); line-height: 1.55; }
+
+    .step-card.highlight.p1 { border-color: var(--p1-mid); background: var(--p1-dim); }
+    .step-card.highlight.p2 { border-color: var(--p2-mid); background: var(--p2-dim); }
+    .step-card.highlight.p3 { border-color: var(--p3-mid); background: var(--p3-dim); }
+    .step-card.highlight.p4 { border-color: var(--p4-mid); background: var(--p4-dim); }
+
+    /* ── DECISION CARDS ─────────────────────────────────────────── */
+    .decision-row { display: flex; gap: 0.8rem; flex-wrap: wrap; }
+    .decision-card {
+      flex: 1 1 140px;
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 0.85rem 1rem;
+      transition: border-color var(--tr), background var(--tr);
+    }
+    .decision-card:hover { border-color: var(--border2); background: var(--bg3); }
+    .decision-label {
+      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; margin-bottom: 0.35rem;
+    }
+    .decision-label.good   { color: var(--p2); }
+    .decision-label.warn   { color: var(--p3); }
+    .decision-label.info   { color: var(--p1); }
+    .decision-label.accent { color: var(--p4); }
+    .decision-title { font-size: 0.88rem; font-weight: 600; color: var(--text); margin-bottom: 0.2rem; }
+    .decision-desc  { font-size: 0.78rem; color: var(--text2); line-height: 1.5; }
+
+    /* ── SVG COMMON ─────────────────────────────────────────────── */
+    .arrow { stroke: rgba(255,255,255,0.18); stroke-width: 1.8; fill: none; }
+    .node-text {
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 12px; font-weight: 600;
+      fill: #fff; dominant-baseline: middle; text-anchor: middle;
+      pointer-events: none;
+    }
+    .node-sub {
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 10px; font-weight: 400;
+      fill: rgba(255,255,255,0.6);
+      dominant-baseline: middle; text-anchor: middle;
+      pointer-events: none;
+    }
+    .fork-label-green {
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 9px; fill: rgba(34,197,94,0.88);
+    }
+    .fork-label-orange {
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 9px; fill: rgba(249,115,22,0.88);
+    }
+    .feedback-label {
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 8px; fill: rgba(168,85,247,0.58);
+      writing-mode: vertical-lr; letter-spacing: 0.1em;
+    }
+
+    /* ── FOOTER ─────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2.5rem 2rem;
+      text-align: center;
+      font-size: 0.8rem; color: var(--text3);
+    }
+    footer strong { color: var(--text2); }
+  </style>
+</head>
+<body>
+
+<!-- ── NAV ──────────────────────────────────────────────────────── -->
+<nav>
+  <div class="nav-inner">
+    <a class="nav-logo" href="#">
+      <span class="nav-logo-icon">LTO</span>
+      <span>Re-Engineering Project</span>
+      <span class="nav-badge">PHL 2025</span>
+    </a>
+  </div>
+</nav>
+
+<!-- ── HERO ─────────────────────────────────────────────────────── -->
+<section class="hero">
+  <div class="hero-eyebrow">
+    <span></span>
+    LTO Renewal — Re-engineered Implementation Flow
+  </div>
+  <h1>Smarter Licensing.<br/><em>Streamlined</em> Renewal.</h1>
+  <p>A re-engineered, citizen-first LTO renewal process—automating checks, gamifying compliance, and enabling seamless multi-channel access.</p>
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <span class="num">4</span>
+      <span class="lbl">Process Phases</span>
+    </div>
+    <div class="hero-stat-divider"></div>
+    <div class="hero-stat">
+      <span class="num">60–90</span>
+      <span class="lbl">Days Head Start</span>
+    </div>
+    <div class="hero-stat-divider"></div>
+    <div class="hero-stat">
+      <span class="num">100%</span>
+      <span class="lbl">Digital-First</span>
+    </div>
+    <div class="hero-stat-divider"></div>
+    <div class="hero-stat">
+      <span class="num">3</span>
+      <span class="lbl">Access Channels</span>
+    </div>
+  </div>
+</section>
+
+<!-- ── TABS ──────────────────────────────────────────────────────── -->
+<div class="tabs-wrap">
+  <div class="tabs">
+    <button class="tab-btn active" data-phase="1" onclick="showPage('phase1',this)">
+      <span class="tab-dot"></span>Phase 1 — Pre-Renewal &amp; Awareness
+    </button>
+    <button class="tab-btn" data-phase="2" onclick="showPage('phase2',this)">
+      <span class="tab-dot"></span>Phase 2 — Eligibility &amp; Assessment
+    </button>
+    <button class="tab-btn" data-phase="3" onclick="showPage('phase3',this)">
+      <span class="tab-dot"></span>Phase 3 — Application &amp; Processing
+    </button>
+    <button class="tab-btn" data-phase="4" onclick="showPage('phase4',this)">
+      <span class="tab-dot"></span>Phase 4 — Post-Renewal &amp; Incentives
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!--  PHASE 1 — Blue                                               -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div id="phase1" class="page active">
+  <div class="phase-wrap">
+    <div class="phase-header">
+      <div class="phase-icon p1">📬</div>
+      <div class="phase-title-block">
+        <div class="phase-label p1">Phase 1</div>
+        <h2>Pre-Renewal &amp; Awareness</h2>
+        <p>Proactive multi-channel communication begins 60–90 days before expiry. Drivers are guided to the LTMS portal through behavioral nudges, AI-powered document pre-checks, and QR-code verification.</p>
+      </div>
+      <span class="phase-badge p1">60–90 Days Prior</span>
+    </div>
+
+    <div class="phase-body">
+      <!-- SVG -->
+      <div class="diagram-panel">
+        <div class="diagram-panel-title">Process Flow</div>
+        <svg viewBox="0 0 380 570" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g1a" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#1e4d8c"/><stop offset="100%" stop-color="#1a3f73"/>
+            </linearGradient>
+            <linearGradient id="g1b" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#1d3d70"/><stop offset="100%" stop-color="#163262"/>
+            </linearGradient>
+            <linearGradient id="g1c" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#2a5298"/><stop offset="100%" stop-color="#1f3f7a"/>
+            </linearGradient>
+            <linearGradient id="g1acc" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#0f2447"/><stop offset="100%" stop-color="#0b1c38"/>
+            </linearGradient>
+            <marker id="ar1" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto">
+              <path d="M1,1 L7,4 L1,7 Z" fill="rgba(59,158,255,0.6)"/>
+            </marker>
+          </defs>
+
+          <rect x="90" y="10" width="200" height="46" rx="9" fill="url(#g1c)" stroke="rgba(59,158,255,0.55)" stroke-width="1.2"/>
+          <text x="190" y="33" class="node-text">Multi-Channel Reminders</text>
+
+          <line x1="190" y1="56" x2="190" y2="74" stroke="rgba(59,158,255,0.45)" stroke-width="1.5" fill="none" marker-end="url(#ar1)"/>
+
+          <rect x="90" y="76" width="200" height="46" rx="9" fill="url(#g1b)" stroke="rgba(59,158,255,0.45)" stroke-width="1.2"/>
+          <text x="190" y="99" class="node-text">Behavioral Nudges</text>
+
+          <line x1="190" y1="122" x2="190" y2="140" stroke="rgba(59,158,255,0.45)" stroke-width="1.5" fill="none" marker-end="url(#ar1)"/>
+
+          <!-- Highlighted portal node -->
+          <rect x="90" y="142" width="200" height="46" rx="9" fill="url(#g1c)" stroke="rgba(59,158,255,0.75)" stroke-width="1.8"/>
+          <text x="190" y="165" class="node-text">LTMS Portal Access</text>
+
+          <!-- Fan out -->
+          <path d="M190,188 L190,208 L55,208 L55,226" stroke="rgba(59,158,255,0.4)" stroke-width="1.4" fill="none" marker-end="url(#ar1)"/>
+          <line x1="190" y1="188" x2="190" y2="226" stroke="rgba(59,158,255,0.4)" stroke-width="1.4" fill="none" marker-end="url(#ar1)"/>
+          <path d="M190,188 L190,208 L325,208 L325,226" stroke="rgba(59,158,255,0.4)" stroke-width="1.4" fill="none" marker-end="url(#ar1)"/>
+
+          <!-- 3 channel boxes -->
+          <rect x="10" y="228" width="90" height="54" rx="8" fill="url(#g1acc)" stroke="rgba(59,158,255,0.28)" stroke-width="1" stroke-dasharray="5,3"/>
+          <text x="55" y="250" class="node-text" font-size="10">Free Data</text>
+          <text x="55" y="265" class="node-sub">Network Providers</text>
+
+          <rect x="140" y="228" width="100" height="54" rx="8" fill="url(#g1a)" stroke="rgba(59,158,255,0.48)" stroke-width="1.2"/>
+          <text x="190" y="250" class="node-text" font-size="10">Interactive</text>
+          <text x="190" y="265" class="node-sub">LTMS Portal</text>
+
+          <rect x="280" y="228" width="90" height="54" rx="8" fill="url(#g1acc)" stroke="rgba(59,158,255,0.28)" stroke-width="1" stroke-dasharray="5,3"/>
+          <text x="325" y="250" class="node-text" font-size="10">LGU Kiosks</text>
+          <text x="325" y="265" class="node-sub">Free Public Access</text>
+
+          <!-- Fan in to recommendation -->
+          <path d="M55,282 L55,316 L190,316 L190,334" stroke="rgba(59,158,255,0.4)" stroke-width="1.4" fill="none" marker-end="url(#ar1)"/>
+          <line x1="190" y1="282" x2="190" y2="334" stroke="rgba(59,158,255,0.4)" stroke-width="1.4" fill="none" marker-end="url(#ar1)"/>
+          <path d="M325,282 L325,316 L190,316 L190,334" stroke="rgba(59,158,255,0.4)" stroke-width="1.4" fill="none" marker-end="url(#ar1)"/>
+
+          <rect x="80" y="336" width="220" height="52" rx="9" fill="url(#g1b)" stroke="rgba(59,158,255,0.5)" stroke-width="1.3"/>
+          <text x="190" y="358" class="node-text">Recommendation Engine</text>
+          <text x="190" y="373" class="node-sub">Profile-based Pathway</text>
+
+          <line x1="190" y1="388" x2="190" y2="406" stroke="rgba(59,158,255,0.45)" stroke-width="1.5" fill="none" marker-end="url(#ar1)"/>
+
+          <rect x="80" y="408" width="220" height="52" rx="9" fill="url(#g1c)" stroke="rgba(59,158,255,0.6)" stroke-width="1.4"/>
+          <text x="190" y="430" class="node-text">AI Chatbot Pre-check</text>
+          <text x="190" y="445" class="node-sub">Document Validation</text>
+
+          <line x1="190" y1="460" x2="190" y2="478" stroke="rgba(59,158,255,0.45)" stroke-width="1.5" fill="none" marker-end="url(#ar1)"/>
+
+          <!-- Terminal node -->
+          <rect x="80" y="480" width="220" height="46" rx="9" fill="rgba(59,158,255,0.18)" stroke="rgba(59,158,255,0.78)" stroke-width="1.8"/>
+          <text x="190" y="503" class="node-text">QR-Code Verification Ready ✓</text>
+        </svg>
+      </div>
+
+      <!-- Steps -->
+      <div class="steps-panel">
+        <div class="panel-title">Key Activities</div>
+        <div class="step-card">
+          <div class="step-num p1">1</div>
+          <div class="step-content">
+            <div class="step-title">Multi-Channel Reminders</div>
+            <div class="step-desc">SMS, email, app push notifications and LGU bulletins sent 60–90 days before license expiry.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num p1">2</div>
+          <div class="step-content">
+            <div class="step-title">Behavioral Nudges</div>
+            <div class="step-desc">Personalized reminders referencing health check deadlines, demerit standing, and renewal windows.</div>
+          </div>
+        </div>
+        <div class="step-card highlight p1">
+          <div class="step-num p1">3</div>
+          <div class="step-content">
+            <div class="step-title">LTMS Portal Access — 3 Channels</div>
+            <div class="step-desc">Standard portal login, free mobile data bundle via telco partners, and LGU kiosks for those without smartphones or connectivity.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num p1">4</div>
+          <div class="step-content">
+            <div class="step-title">Renewal Recommendation Engine</div>
+            <div class="step-desc">Analyses driver profile, violations, health records, and vehicle class to suggest the fastest renewal pathway.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num p1">5</div>
+          <div class="step-content">
+            <div class="step-title">AI Chatbot Document Pre-check</div>
+            <div class="step-desc">Driver uploads documents; AI validates completeness and authenticity before visiting any counter.</div>
+          </div>
+        </div>
+        <div class="step-card highlight p1">
+          <div class="step-num p1">6</div>
+          <div class="step-content">
+            <div class="step-title">QR-Code Verification Ready</div>
+            <div class="step-desc">System issues a digital QR token confirming pre-check completion—speeds up in-person counters or enables fully remote renewal.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!--  PHASE 2 — Green                                              -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div id="phase2" class="page">
+  <div class="phase-wrap">
+    <div class="phase-header">
+      <div class="phase-icon p2">✅</div>
+      <div class="phase-title-block">
+        <div class="phase-label p2">Phase 2</div>
+        <h2>Eligibility &amp; Assessment</h2>
+        <p>Automated LTMS pre-screening integrates with PNP, MMDA, and DOH APIs to assess demerit points and health status. Low-risk drivers enjoy a gamified fast-track while moderate/high-risk drivers receive tiered reorientation.</p>
+      </div>
+      <span class="phase-badge p2">Automated Screening</span>
+    </div>
+
+    <div class="phase-body">
+      <div class="diagram-panel">
+        <div class="diagram-panel-title">Eligibility Flow</div>
+        <svg viewBox="0 0 380 550" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g2a" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#14532d"/><stop offset="100%" stop-color="#0f3d22"/>
+            </linearGradient>
+            <linearGradient id="g2b" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#166534"/><stop offset="100%" stop-color="#134d28"/>
+            </linearGradient>
+            <linearGradient id="g2lo" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#1a4731"/><stop offset="100%" stop-color="#133824"/>
+            </linearGradient>
+            <linearGradient id="g2hi" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#3d2800"/><stop offset="100%" stop-color="#2d1d00"/>
+            </linearGradient>
+            <marker id="ar2" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto">
+              <path d="M1,1 L7,4 L1,7 Z" fill="rgba(34,197,94,0.6)"/>
+            </marker>
+          </defs>
+
+          <rect x="90" y="10" width="200" height="46" rx="9" fill="url(#g2b)" stroke="rgba(34,197,94,0.55)" stroke-width="1.2"/>
+          <text x="190" y="33" class="node-text">Automated LTMS Pre-Screen</text>
+
+          <line x1="190" y1="56" x2="190" y2="74" stroke="rgba(34,197,94,0.45)" stroke-width="1.5" fill="none" marker-end="url(#ar2)"/>
+
+          <rect x="90" y="76" width="200" height="52" rx="9" fill="url(#g2a)" stroke="rgba(34,197,94,0.45)" stroke-width="1.2"/>
+          <text x="190" y="98" class="node-text">Gov Data Integration</text>
+          <text x="190" y="113" class="node-sub">PNP · MMDA · DOH API</text>
+
+          <line x1="190" y1="128" x2="190" y2="146" stroke="rgba(34,197,94,0.45)" stroke-width="1.5" fill="none" marker-end="url(#ar2)"/>
+
+          <rect x="90" y="148" width="200" height="46" rx="9" fill="url(#g2b)" stroke="rgba(34,197,94,0.68)" stroke-width="1.6"/>
+          <text x="190" y="171" class="node-text">Risk &amp; Demerit Assessment</text>
+
+          <!-- Fork labels -->
+          <text x="82" y="212" class="fork-label-green">Low Risk / 0 Demerits</text>
+          <text x="208" y="212" class="fork-label-orange">Mod-High Risk (1+)</text>
+
+          <path d="M190,194 L190,218 L80,218 L80,238" stroke="rgba(34,197,94,0.45)" stroke-width="1.4" fill="none" marker-end="url(#ar2)"/>
+          <path d="M190,194 L190,218 L300,218 L300,238" stroke="rgba(249,115,22,0.45)" stroke-width="1.4" fill="none" marker-end="url(#ar2)"/>
+
+          <!-- Low risk box -->
+          <rect x="20" y="240" width="120" height="52" rx="9" fill="url(#g2lo)" stroke="rgba(34,197,94,0.52)" stroke-width="1.3"/>
+          <text x="80" y="262" class="node-text" font-size="11">Gamified Plain</text>
+          <text x="80" y="276" class="node-sub">Renewal Pathway</text>
+
+          <!-- High risk box -->
+          <rect x="240" y="240" width="120" height="52" rx="9" fill="url(#g2hi)" stroke="rgba(249,115,22,0.52)" stroke-width="1.3"/>
+          <text x="300" y="262" class="node-text" font-size="11">Tiered</text>
+          <text x="300" y="276" class="node-sub">Reorientation</text>
+
+          <!-- Reorientation forks -->
+          <path d="M300,292 L300,318 L130,318 L130,338" stroke="rgba(249,115,22,0.38)" stroke-width="1.3" fill="none" marker-end="url(#ar2)"/>
+          <path d="M300,292 L300,318 L340,318 L340,338" stroke="rgba(249,115,22,0.38)" stroke-width="1.3" fill="none" marker-end="url(#ar2)"/>
+
+          <!-- Reorientation options -->
+          <rect x="85" y="340" width="90" height="48" rx="8" fill="rgba(40,20,0,0.85)" stroke="rgba(249,115,22,0.32)" stroke-width="1" stroke-dasharray="4,3"/>
+          <text x="130" y="360" class="node-text" font-size="10">TESDA</text>
+          <text x="130" y="374" class="node-sub">Short Courses</text>
+
+          <rect x="295" y="340" width="80" height="48" rx="8" fill="rgba(40,20,0,0.85)" stroke="rgba(249,115,22,0.32)" stroke-width="1" stroke-dasharray="4,3"/>
+          <text x="335" y="360" class="node-text" font-size="10">Scenario</text>
+          <text x="335" y="374" class="node-sub">Simulation</text>
+
+          <!-- Converge to proceed -->
+          <path d="M80,292 L80,458 L185,458 L185,468" stroke="rgba(34,197,94,0.38)" stroke-width="1.3" fill="none" marker-end="url(#ar2)"/>
+          <path d="M130,388 L130,446 L190,446 L190,468" stroke="rgba(249,115,22,0.32)" stroke-width="1.2" fill="none" marker-end="url(#ar2)"/>
+          <path d="M335,388 L335,446 L200,446 L200,468" stroke="rgba(249,115,22,0.32)" stroke-width="1.2" fill="none" marker-end="url(#ar2)"/>
+
+          <!-- Terminal: Proceed -->
+          <rect x="90" y="470" width="200" height="46" rx="9" fill="rgba(34,197,94,0.18)" stroke="rgba(34,197,94,0.78)" stroke-width="1.8"/>
+          <text x="190" y="493" class="node-text">Proceed to Application ✓</text>
+        </svg>
+      </div>
+
+      <div class="steps-panel">
+        <div class="panel-title">Key Activities</div>
+        <div class="step-card">
+          <div class="step-num p2">1</div>
+          <div class="step-content">
+            <div class="step-title">Automated LTMS Pre-Screening</div>
+            <div class="step-desc">System pulls driver record from LTMS database and initiates automated eligibility evaluation instantly.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num p2">2</div>
+          <div class="step-content">
+            <div class="step-title">Government Data Integration</div>
+            <div class="step-desc">Real-time API calls to PNP (criminal record), MMDA (traffic violations), and DOH (health certificate status).</div>
+          </div>
+        </div>
+        <div class="step-card highlight p2">
+          <div class="step-num p2">3</div>
+          <div class="step-content">
+            <div class="step-title">Risk &amp; Demerit Assessment</div>
+            <div class="step-desc">Scoring engine calculates total demerits, severity of violations, and health compliance to determine renewal pathway.</div>
+          </div>
+        </div>
+        <div class="decision-row">
+          <div class="decision-card">
+            <div class="decision-label good">✓ Low Risk</div>
+            <div class="decision-title">Gamified Plain Renewal</div>
+            <div class="decision-desc">Zero-demerit drivers unlock a fast, game-like renewal flow with progress badges and fee incentives.</div>
+          </div>
+          <div class="decision-card">
+            <div class="decision-label warn">⚠ Moderate / High Risk</div>
+            <div class="decision-title">Tiered Reorientation</div>
+            <div class="decision-desc">TESDA short courses, scenario simulation, or micro-learning apps based on violation type and severity.</div>
+          </div>
+        </div>
+        <div class="step-card highlight p2">
+          <div class="step-num p2">4</div>
+          <div class="step-content">
+            <div class="step-title">Proceed to Application</div>
+            <div class="step-desc">Once assessment is complete and any required reorientation is done, driver is cleared to proceed to Phase 3.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!--  PHASE 3 — Orange                                             -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div id="phase3" class="page">
+  <div class="phase-wrap">
+    <div class="phase-header">
+      <div class="phase-icon p3">⚙️</div>
+      <div class="phase-title-block">
+        <div class="phase-label p3">Phase 3</div>
+        <h2>Application &amp; Processing</h2>
+        <p>Driver submits formal application and DOH medical form, pays fees through the intelligent Payment Engine, and undergoes Identity and Compliance Verification—supporting in-person, digital ID, and OFW remote pathways.</p>
+      </div>
+      <span class="phase-badge p3">Document Processing</span>
+    </div>
+
+    <div class="phase-body">
+      <div class="diagram-panel">
+        <div class="diagram-panel-title">Processing Flow</div>
+        <svg viewBox="0 0 380 548" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g3a" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#7c2d12"/><stop offset="100%" stop-color="#5a1e09"/>
+            </linearGradient>
+            <linearGradient id="g3b" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#9a3412"/><stop offset="100%" stop-color="#7a2910"/>
+            </linearGradient>
+            <linearGradient id="g3fee" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#6b2610"/><stop offset="100%" stop-color="#4e1c0b"/>
+            </linearGradient>
+            <linearGradient id="g3opt" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#3d1408"/><stop offset="100%" stop-color="#2d0e06"/>
+            </linearGradient>
+            <marker id="ar3" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto">
+              <path d="M1,1 L7,4 L1,7 Z" fill="rgba(249,115,22,0.6)"/>
+            </marker>
+          </defs>
+
+          <rect x="90" y="10" width="200" height="46" rx="9" fill="url(#g3b)" stroke="rgba(249,115,22,0.55)" stroke-width="1.2"/>
+          <text x="190" y="33" class="node-text">Application &amp; DOH Submit</text>
+
+          <line x1="190" y1="56" x2="190" y2="74" stroke="rgba(249,115,22,0.45)" stroke-width="1.5" fill="none" marker-end="url(#ar3)"/>
+
+          <rect x="90" y="76" width="200" height="46" rx="9" fill="url(#g3a)" stroke="rgba(249,115,22,0.68)" stroke-width="1.6"/>
+          <text x="190" y="99" class="node-text">💳 Fee Payment Engine</text>
+
+          <!-- Fan out fees -->
+          <path d="M190,122 L190,146 L55,146 L55,166" stroke="rgba(249,115,22,0.38)" stroke-width="1.4" fill="none" marker-end="url(#ar3)"/>
+          <line x1="190" y1="122" x2="190" y2="166" stroke="rgba(249,115,22,0.38)" stroke-width="1.4" fill="none" marker-end="url(#ar3)"/>
+          <path d="M190,122 L190,146 L325,146 L325,166" stroke="rgba(249,115,22,0.38)" stroke-width="1.4" fill="none" marker-end="url(#ar3)"/>
+
+          <!-- Fee boxes -->
+          <rect x="10" y="168" width="90" height="60" rx="8" fill="url(#g3fee)" stroke="rgba(249,115,22,0.48)" stroke-width="1.2"/>
+          <text x="55" y="189" class="node-text" font-size="10">Standard</text>
+          <text x="55" y="203" class="node-sub">₱585.00</text>
+          <text x="55" y="217" class="node-sub">Transparent</text>
+
+          <rect x="140" y="168" width="100" height="60" rx="8" fill="url(#g3opt)" stroke="rgba(249,115,22,0.32)" stroke-width="1" stroke-dasharray="5,3"/>
+          <text x="190" y="189" class="node-text" font-size="10">Risk-Based</text>
+          <text x="190" y="203" class="node-sub">Lower for</text>
+          <text x="190" y="217" class="node-sub">Safe Drivers</text>
+
+          <rect x="280" y="168" width="90" height="60" rx="8" fill="url(#g3opt)" stroke="rgba(249,115,22,0.32)" stroke-width="1" stroke-dasharray="5,3"/>
+          <text x="325" y="189" class="node-text" font-size="10">Waived/</text>
+          <text x="325" y="203" class="node-sub">Discounted</text>
+          <text x="325" y="217" class="node-sub">Volunteer/Early</text>
+
+          <!-- Converge to Identity Verif -->
+          <path d="M55,228 L55,266 L185,266 L185,284" stroke="rgba(249,115,22,0.38)" stroke-width="1.4" fill="none" marker-end="url(#ar3)"/>
+          <line x1="190" y1="228" x2="190" y2="284" stroke="rgba(249,115,22,0.38)" stroke-width="1.4" fill="none" marker-end="url(#ar3)"/>
+          <path d="M325,228 L325,266 L195,266 L195,284" stroke="rgba(249,115,22,0.38)" stroke-width="1.4" fill="none" marker-end="url(#ar3)"/>
+
+          <rect x="90" y="286" width="200" height="52" rx="9" fill="url(#g3b)" stroke="rgba(249,115,22,0.68)" stroke-width="1.6"/>
+          <text x="190" y="308" class="node-text">Identity &amp; Compliance</text>
+          <text x="190" y="323" class="node-sub">Verification</text>
+
+          <!-- Fan out processing modes -->
+          <path d="M190,338 L190,364 L55,364 L55,384" stroke="rgba(249,115,22,0.38)" stroke-width="1.4" fill="none" marker-end="url(#ar3)"/>
+          <line x1="190" y1="338" x2="190" y2="384" stroke="rgba(249,115,22,0.38)" stroke-width="1.4" fill="none" marker-end="url(#ar3)"/>
+          <path d="M190,338 L190,364 L325,364 L325,384" stroke="rgba(249,115,22,0.38)" stroke-width="1.4" fill="none" marker-end="url(#ar3)"/>
+
+          <!-- Processing modes -->
+          <rect x="10" y="386" width="90" height="60" rx="8" fill="url(#g3fee)" stroke="rgba(249,115,22,0.48)" stroke-width="1.2"/>
+          <text x="55" y="407" class="node-text" font-size="10">In-Person</text>
+          <text x="55" y="421" class="node-sub">LTO Counter</text>
+          <text x="55" y="435" class="node-sub">Dress Code</text>
+
+          <rect x="140" y="386" width="100" height="60" rx="8" fill="url(#g3opt)" stroke="rgba(249,115,22,0.32)" stroke-width="1" stroke-dasharray="5,3"/>
+          <text x="190" y="407" class="node-text" font-size="10">LTMS</text>
+          <text x="190" y="421" class="node-sub">Digital ID</text>
+          <text x="190" y="435" class="node-sub">Fully Online</text>
+
+          <rect x="280" y="386" width="90" height="60" rx="8" fill="url(#g3opt)" stroke="rgba(249,115,22,0.32)" stroke-width="1" stroke-dasharray="5,3"/>
+          <text x="325" y="407" class="node-text" font-size="10">OFW Remote</text>
+          <text x="325" y="421" class="node-sub">Biometric</text>
+          <text x="325" y="435" class="node-sub">Capture</text>
+
+          <!-- Converge to Approval -->
+          <path d="M55,446 L55,486 L185,486 L185,494" stroke="rgba(249,115,22,0.38)" stroke-width="1.4" fill="none" marker-end="url(#ar3)"/>
+          <line x1="190" y1="446" x2="190" y2="494" stroke="rgba(249,115,22,0.38)" stroke-width="1.4" fill="none" marker-end="url(#ar3)"/>
+          <path d="M325,446 L325,486 L195,486 L195,494" stroke="rgba(249,115,22,0.38)" stroke-width="1.4" fill="none" marker-end="url(#ar3)"/>
+
+          <!-- Terminal -->
+          <rect x="90" y="496" width="200" height="40" rx="9" fill="rgba(249,115,22,0.18)" stroke="rgba(249,115,22,0.78)" stroke-width="1.8"/>
+          <text x="190" y="516" class="node-text">Approved &amp; License Issued ✓</text>
+        </svg>
+      </div>
+
+      <div class="steps-panel">
+        <div class="panel-title">Key Activities</div>
+        <div class="step-card">
+          <div class="step-num p3">1</div>
+          <div class="step-content">
+            <div class="step-title">Application &amp; DOH Medical Form</div>
+            <div class="step-desc">Driver submits completed application with DOH medical certificate (digital or physical) through preferred channel.</div>
+          </div>
+        </div>
+        <div class="step-card highlight p3">
+          <div class="step-num p3">2</div>
+          <div class="step-content">
+            <div class="step-title">Fee Payment Engine</div>
+            <div class="step-desc">Transparent, dynamic fee computation. Safe drivers get lower fees; early renewers and volunteers receive discounts or waivers.</div>
+          </div>
+        </div>
+        <div class="decision-row">
+          <div class="decision-card">
+            <div class="decision-label info">Standard</div>
+            <div class="decision-title">₱585 Flat Fee</div>
+            <div class="decision-desc">Full breakdown shown before payment. Multiple payment channels supported.</div>
+          </div>
+          <div class="decision-card">
+            <div class="decision-label warn">Risk-Based</div>
+            <div class="decision-title">Reduced Fee</div>
+            <div class="decision-desc">Lower premiums for safe driving record and on-time renewal history.</div>
+          </div>
+          <div class="decision-card">
+            <div class="decision-label good">Waived</div>
+            <div class="decision-title">Free Renewal</div>
+            <div class="decision-desc">Community volunteers and early renewers may qualify for fee waivers.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num p3">3</div>
+          <div class="step-content">
+            <div class="step-title">Identity &amp; Compliance Verification</div>
+            <div class="step-desc">Biometrics, photo, and document integrity confirmed via LTMS AI matching against government databases.</div>
+          </div>
+        </div>
+        <div class="decision-row">
+          <div class="decision-card">
+            <div class="decision-label info">In-Person</div>
+            <div class="decision-title">LTO Counter</div>
+            <div class="decision-desc">Standard walk-in with strict dress code enforcement.</div>
+          </div>
+          <div class="decision-card">
+            <div class="decision-label info">Digital</div>
+            <div class="decision-title">LTMS Digital ID</div>
+            <div class="decision-desc">100% remote renewal via LTMS portal with digital license issuance.</div>
+          </div>
+          <div class="decision-card">
+            <div class="decision-label accent">OFW Remote</div>
+            <div class="decision-title">Overseas Renewal</div>
+            <div class="decision-desc">POLO-assisted biometric capture at PH embassies/consulates.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<!--  PHASE 4 — Purple                                             -->
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div id="phase4" class="page">
+  <div class="phase-wrap">
+    <div class="phase-header">
+      <div class="phase-icon p4">🏆</div>
+      <div class="phase-title-block">
+        <div class="phase-label p4">Phase 4</div>
+        <h2>Post-Renewal &amp; Incentives</h2>
+        <p>End-to-end time is measured and gamified to drive system improvements. Compliant drivers receive "Plain Renewal Badges" and insurance premium discounts through insurer data tie-ups—reinforcing safe-driving behavioral norms.</p>
+      </div>
+      <span class="phase-badge p4">Incentives &amp; Feedback</span>
+    </div>
+
+    <div class="phase-body">
+      <div class="diagram-panel">
+        <div class="diagram-panel-title">Post-Renewal Flow</div>
+        <svg viewBox="0 0 380 510" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="g4a" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#4c1d95"/><stop offset="100%" stop-color="#3b1578"/>
+            </linearGradient>
+            <linearGradient id="g4b" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#5b21b6"/><stop offset="100%" stop-color="#481a96"/>
+            </linearGradient>
+            <linearGradient id="g4dk" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#2e1065"/><stop offset="100%" stop-color="#1e0b45"/>
+            </linearGradient>
+            <marker id="ar4" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto">
+              <path d="M1,1 L7,4 L1,7 Z" fill="rgba(168,85,247,0.6)"/>
+            </marker>
+          </defs>
+
+          <rect x="90" y="10" width="200" height="52" rx="9" fill="url(#g4a)" stroke="rgba(168,85,247,0.55)" stroke-width="1.2"/>
+          <text x="190" y="32" class="node-text">Measure End-to-End Time</text>
+          <text x="190" y="47" class="node-sub">Processing Analytics</text>
+
+          <line x1="190" y1="62" x2="190" y2="80" stroke="rgba(168,85,247,0.45)" stroke-width="1.5" fill="none" marker-end="url(#ar4)"/>
+
+          <rect x="90" y="82" width="200" height="52" rx="9" fill="url(#g4b)" stroke="rgba(168,85,247,0.5)" stroke-width="1.2"/>
+          <text x="190" y="104" class="node-text">Gamify Processing Times</text>
+          <text x="190" y="119" class="node-sub">Leaderboard &amp; Transparency</text>
+
+          <line x1="190" y1="134" x2="190" y2="152" stroke="rgba(168,85,247,0.45)" stroke-width="1.5" fill="none" marker-end="url(#ar4)"/>
+
+          <!-- Badge — highlighted -->
+          <rect x="90" y="154" width="200" height="52" rx="9" fill="rgba(168,85,247,0.22)" stroke="rgba(168,85,247,0.78)" stroke-width="1.8"/>
+          <text x="190" y="176" class="node-text">🏅 "Plain Renewal Badge"</text>
+          <text x="190" y="191" class="node-sub">Compliance Recognition</text>
+
+          <line x1="190" y1="206" x2="190" y2="224" stroke="rgba(168,85,247,0.45)" stroke-width="1.5" fill="none" marker-end="url(#ar4)"/>
+
+          <rect x="90" y="226" width="200" height="52" rx="9" fill="url(#g4a)" stroke="rgba(168,85,247,0.5)" stroke-width="1.2"/>
+          <text x="190" y="248" class="node-text">Insurance Provider Data Tie-up</text>
+          <text x="190" y="263" class="node-sub">Real-time Safe-Driving Feed</text>
+
+          <line x1="190" y1="278" x2="190" y2="296" stroke="rgba(168,85,247,0.45)" stroke-width="1.5" fill="none" marker-end="url(#ar4)"/>
+
+          <!-- Terminal: Incentive -->
+          <rect x="70" y="298" width="240" height="66" rx="9" fill="url(#g4dk)" stroke="rgba(168,85,247,0.75)" stroke-width="1.8"/>
+          <text x="190" y="322" class="node-text">Reduced Insurance Premiums 🎉</text>
+          <text x="190" y="338" class="node-sub">Ongoing Behavioral Norm</text>
+          <text x="190" y="352" class="node-sub">Enforcement &amp; Driver Rewards</text>
+
+          <!-- Feedback loop arrow -->
+          <path d="M70,364 Q18,380 18,300 Q18,220 70,236" stroke="rgba(168,85,247,0.28)" stroke-width="1.2" stroke-dasharray="5,4" fill="none" marker-end="url(#ar4)"/>
+          <text x="5" y="302" class="feedback-label">FEEDBACK LOOP</text>
+
+          <!-- Survey node (dashed) -->
+          <line x1="190" y1="364" x2="190" y2="398" stroke="rgba(168,85,247,0.35)" stroke-width="1.3" stroke-dasharray="4,3" fill="none" marker-end="url(#ar4)"/>
+          <rect x="90" y="400" width="200" height="52" rx="9" fill="url(#g4a)" stroke="rgba(168,85,247,0.32)" stroke-width="1" stroke-dasharray="5,3"/>
+          <text x="190" y="422" class="node-text" font-size="11">Citizen Satisfaction Survey</text>
+          <text x="190" y="437" class="node-sub">NPS + Process Improvement</text>
+        </svg>
+      </div>
+
+      <div class="steps-panel">
+        <div class="panel-title">Key Activities</div>
+        <div class="step-card">
+          <div class="step-num p4">1</div>
+          <div class="step-content">
+            <div class="step-title">End-to-End Time Measurement</div>
+            <div class="step-desc">LTMS records timestamps from first reminder to license issuance, publishing aggregate analytics on the public dashboard.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num p4">2</div>
+          <div class="step-content">
+            <div class="step-title">Gamified Processing Times</div>
+            <div class="step-desc">LTO offices compete on regional leaderboards for fastest processing. Citizens see real-time queue times and office performance scores.</div>
+          </div>
+        </div>
+        <div class="step-card highlight p4">
+          <div class="step-num p4">3</div>
+          <div class="step-content">
+            <div class="step-title">🏅 Plain Renewal Badge</div>
+            <div class="step-desc">Drivers who renew with zero demerits and zero violations receive a "Plain Renewal Badge" stored in their LTMS digital profile—unlocking exclusive perks.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num p4">4</div>
+          <div class="step-content">
+            <div class="step-title">Insurance Provider Data Tie-up</div>
+            <div class="step-desc">Consented data-sharing agreement with insurance providers feeds real-time safe-driving history directly to underwriting models.</div>
+          </div>
+        </div>
+        <div class="step-card highlight p4">
+          <div class="step-num p4">5</div>
+          <div class="step-content">
+            <div class="step-title">Reduced Insurance Premiums 🎉</div>
+            <div class="step-desc">Safe drivers automatically receive lower insurance premiums—creating a virtuous cycle that reinforces behavioral compliance beyond the renewal process.</div>
+          </div>
+        </div>
+        <div class="step-card">
+          <div class="step-num p4">6</div>
+          <div class="step-content">
+            <div class="step-title">Citizen Satisfaction Survey</div>
+            <div class="step-desc">Automated NPS survey sent post-renewal; responses feed directly into the process improvement backlog for continuous re-engineering.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── FOOTER ───────────────────────────────────────────────────── -->
+<footer>
+  <strong>LTO Renewal Re-Engineering Project</strong> &nbsp;·&nbsp;
+  Philippines 2025 &nbsp;·&nbsp; Interactive Implementation Flow &nbsp;·&nbsp;
+  4 Phases &nbsp;·&nbsp; Digital-First · Citizen-Centric
+</footer>
+
+<script>
+  function showPage(pageId, btn) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+    document.getElementById(pageId).classList.add('active');
+    if (btn) btn.classList.add('active');
+    window.scrollTo({ top: document.querySelector('.tabs-wrap').offsetTop, behavior: 'smooth' });
+  }
+</script>
+
+</body>
+</html>
