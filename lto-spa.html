@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LTO Renewal — Re-engineered Implementation Flow</title>
+  <title>LTO Renewal — Single Page Application</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -65,15 +65,23 @@
     ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
 
+    /* ── PROGRESS BAR ────────────────────────────────────────────── */
+    .progress-bar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+      height: 3px; background: linear-gradient(90deg, var(--p1), var(--p2), var(--p3), var(--p4));
+      width: 0%; transition: width 0.1s linear;
+    }
+
     /* ── NAV ─────────────────────────────────────────────────────── */
     nav {
       position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
       height: 62px;
       display: flex; align-items: center;
-      background: rgba(10,10,10,0.80);
+      background: rgba(10,10,10,0.85);
       -webkit-backdrop-filter: blur(20px) saturate(1.6);
       backdrop-filter: blur(20px) saturate(1.6);
       border-bottom: 1px solid var(--border);
+      padding-top: 3px;
     }
     .nav-inner {
       width: 100%; max-width: 1280px; margin: 0 auto;
@@ -100,11 +108,49 @@
       margin-left: 0.5rem;
     }
 
+    /* ── SCROLL NAV ──────────────────────────────────────────────── */
+    .scroll-nav {
+      display: flex; gap: 1.2rem; align-items: center;
+    }
+    .scroll-nav-item {
+      display: flex; align-items: center; gap: 0.6rem;
+      font-size: 0.75rem; font-weight: 600;
+      padding: 6px 12px; border-radius: 6px;
+      color: var(--text2); text-decoration: none;
+      transition: all var(--tr);
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .scroll-nav-item:hover {
+      color: var(--text);
+      border-color: var(--border2);
+      background: rgba(255,255,255,0.04);
+    }
+    .scroll-nav-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      display: block;
+    }
+    .scroll-nav-item[data-phase="1"] .scroll-nav-dot { background: var(--p1); opacity: 0.5; }
+    .scroll-nav-item[data-phase="2"] .scroll-nav-dot { background: var(--p2); opacity: 0.5; }
+    .scroll-nav-item[data-phase="3"] .scroll-nav-dot { background: var(--p3); opacity: 0.5; }
+    .scroll-nav-item[data-phase="4"] .scroll-nav-dot { background: var(--p4); opacity: 0.5; }
+    
+    .scroll-nav-item.active {
+      color: var(--text);
+      background: rgba(255,255,255,0.08);
+      border-color: var(--border2);
+    }
+    .scroll-nav-item[data-phase="1"].active .scroll-nav-dot { background: var(--p1); opacity: 1; }
+    .scroll-nav-item[data-phase="2"].active .scroll-nav-dot { background: var(--p2); opacity: 1; }
+    .scroll-nav-item[data-phase="3"].active .scroll-nav-dot { background: var(--p3); opacity: 1; }
+    .scroll-nav-item[data-phase="4"].active .scroll-nav-dot { background: var(--p4); opacity: 1; }
+
     /* ── HERO ────────────────────────────────────────────────────── */
     .hero {
       padding: 140px 2rem 70px;
       text-align: center;
       background: radial-gradient(ellipse 80% 60% at 50% -5%, rgba(59,158,255,0.10) 0%, transparent 70%);
+      margin-top: 3px;
     }
     .hero-eyebrow {
       display: inline-flex; align-items: center; gap: 0.5rem;
@@ -136,60 +182,16 @@
     .hero-stat .lbl { font-size: 0.78rem; color: var(--text2); font-weight: 500; }
     .hero-stat-divider { width: 1px; height: 40px; background: var(--border2); }
 
-    /* ── PHASE TABS ─────────────────────────────────────────────── */
-    .tabs-wrap {
-      position: sticky; top: 62px; z-index: 900;
-      background: rgba(10,10,10,0.85);
-      -webkit-backdrop-filter: blur(20px);
-      backdrop-filter: blur(20px);
-      border-bottom: 1px solid var(--border);
-      padding: 0 2rem;
+    /* ── PHASE SECTION ───────────────────────────────────────────– */
+    .phase-section {
+      scroll-margin-top: 65px;
+      padding: 3rem 2rem 5rem;
+      border-top: 1px solid var(--border);
     }
-    .tabs {
-      display: flex; align-items: stretch;
-      max-width: 1280px; margin: 0 auto;
-      gap: 0; overflow-x: auto;
-    }
-    .tabs::-webkit-scrollbar { display: none; }
-    .tab-btn {
-      display: flex; align-items: center; gap: 0.55rem;
-      padding: 0 1.4rem; height: 52px;
-      font-size: 0.88rem; font-weight: 600;
-      color: var(--text2); background: none; border: none;
-      border-bottom: 2px solid transparent;
-      cursor: pointer; white-space: nowrap;
-      transition: color var(--tr), border-color var(--tr);
-      flex-shrink: 0;
-    }
-    .tab-btn:hover { color: var(--text); }
-    .tab-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      flex-shrink: 0; opacity: 0.5; transition: opacity var(--tr);
-    }
-    .tab-btn.active .tab-dot { opacity: 1; }
-    .tab-btn[data-phase="1"] .tab-dot { background: var(--p1); }
-    .tab-btn[data-phase="2"] .tab-dot { background: var(--p2); }
-    .tab-btn[data-phase="3"] .tab-dot { background: var(--p3); }
-    .tab-btn[data-phase="4"] .tab-dot { background: var(--p4); }
-    .tab-btn[data-phase="1"].active { color: var(--p1); border-bottom-color: var(--p1); }
-    .tab-btn[data-phase="2"].active { color: var(--p2); border-bottom-color: var(--p2); }
-    .tab-btn[data-phase="3"].active { color: var(--p3); border-bottom-color: var(--p3); }
-    .tab-btn[data-phase="4"].active { color: var(--p4); border-bottom-color: var(--p4); }
-
-    /* ── PAGE LAYOUT ─────────────────────────────────────────────── */
-    .page { display: none; }
-    .page.active {
-      display: block;
-      animation: fadeUp 0.35s var(--tr) both;
-    }
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(16px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
+    .phase-section:first-of-type { border-top: none; }
 
     .phase-wrap {
       max-width: 1280px; margin: 0 auto;
-      padding: 3rem 2rem 5rem;
     }
 
     /* ── PHASE HEADER ─────────────────────────────────────────────── */
@@ -356,8 +358,12 @@
     }
     footer strong { color: var(--text2); }
   </style>
+
 </head>
 <body>
+
+<!-- ── PROGRESS BAR ────────────────────────────────────────────── -->
+<div class="progress-bar" id="progressBar"></div>
 
 <!-- ── NAV ──────────────────────────────────────────────────────── -->
 <nav>
@@ -367,6 +373,24 @@
       <span>Re-Engineering Project</span>
       <span class="nav-badge">PHL 2025</span>
     </a>
+    <div class="scroll-nav">
+      <a class="scroll-nav-item active" data-phase="1" data-target="phase1">
+        <span class="scroll-nav-dot"></span>
+        <span>Phase 1</span>
+      </a>
+      <a class="scroll-nav-item" data-phase="2" data-target="phase2">
+        <span class="scroll-nav-dot"></span>
+        <span>Phase 2</span>
+      </a>
+      <a class="scroll-nav-item" data-phase="3" data-target="phase3">
+        <span class="scroll-nav-dot"></span>
+        <span>Phase 3</span>
+      </a>
+      <a class="scroll-nav-item" data-phase="4" data-target="phase4">
+        <span class="scroll-nav-dot"></span>
+        <span>Phase 4</span>
+      </a>
+    </div>
   </div>
 </nav>
 
@@ -401,28 +425,10 @@
   </div>
 </section>
 
-<!-- ── TABS ──────────────────────────────────────────────────────── -->
-<div class="tabs-wrap">
-  <div class="tabs">
-    <button class="tab-btn active" data-phase="1" onclick="showPage('phase1',this)">
-      <span class="tab-dot"></span>Phase 1 — Pre-Renewal &amp; Awareness
-    </button>
-    <button class="tab-btn" data-phase="2" onclick="showPage('phase2',this)">
-      <span class="tab-dot"></span>Phase 2 — Eligibility &amp; Assessment
-    </button>
-    <button class="tab-btn" data-phase="3" onclick="showPage('phase3',this)">
-      <span class="tab-dot"></span>Phase 3 — Application &amp; Processing
-    </button>
-    <button class="tab-btn" data-phase="4" onclick="showPage('phase4',this)">
-      <span class="tab-dot"></span>Phase 4 — Post-Renewal &amp; Incentives
-    </button>
-  </div>
-</div>
-
 <!-- ══════════════════════════════════════════════════════════════ -->
 <!--  PHASE 1 — Blue                                               -->
 <!-- ══════════════════════════════════════════════════════════════ -->
-<div id="phase1" class="page active">
+<section id="phase1" class="phase-section">
   <div class="phase-wrap">
     <div class="phase-header">
       <div class="phase-icon p1">📬</div>
@@ -560,12 +566,12 @@
       </div>
     </div>
   </div>
-</div>
+</section>
 
 <!-- ══════════════════════════════════════════════════════════════ -->
 <!--  PHASE 2 — Green                                              -->
 <!-- ══════════════════════════════════════════════════════════════ -->
-<div id="phase2" class="page">
+<section id="phase2" class="phase-section">
   <div class="phase-wrap">
     <div class="phase-header">
       <div class="phase-icon p2">✅</div>
@@ -699,12 +705,12 @@
       </div>
     </div>
   </div>
-</div>
+</section>
 
 <!-- ══════════════════════════════════════════════════════════════ -->
 <!--  PHASE 3 — Orange                                             -->
 <!-- ══════════════════════════════════════════════════════════════ -->
-<div id="phase3" class="page">
+<section id="phase3" class="phase-section">
   <div class="phase-wrap">
     <div class="phase-header">
       <div class="phase-icon p3">⚙️</div>

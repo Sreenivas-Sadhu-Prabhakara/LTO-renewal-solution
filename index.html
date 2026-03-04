@@ -136,52 +136,8 @@
     .hero-stat .lbl { font-size: 0.78rem; color: var(--text2); font-weight: 500; }
     .hero-stat-divider { width: 1px; height: 40px; background: var(--border2); }
 
-    /* ── PHASE TABS ─────────────────────────────────────────────── */
-    .tabs-wrap {
-      position: sticky; top: 62px; z-index: 900;
-      background: rgba(10,10,10,0.85);
-      -webkit-backdrop-filter: blur(20px);
-      backdrop-filter: blur(20px);
-      border-bottom: 1px solid var(--border);
-      padding: 0 2rem;
-    }
-    .tabs {
-      display: flex; align-items: stretch;
-      max-width: 1280px; margin: 0 auto;
-      gap: 0; overflow-x: auto;
-    }
-    .tabs::-webkit-scrollbar { display: none; }
-    .tab-btn {
-      display: flex; align-items: center; gap: 0.55rem;
-      padding: 0 1.4rem; height: 52px;
-      font-size: 0.88rem; font-weight: 600;
-      color: var(--text2); background: none; border: none;
-      border-bottom: 2px solid transparent;
-      cursor: pointer; white-space: nowrap;
-      transition: color var(--tr), border-color var(--tr);
-      flex-shrink: 0;
-    }
-    .tab-btn:hover { color: var(--text); }
-    .tab-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      flex-shrink: 0; opacity: 0.5; transition: opacity var(--tr);
-    }
-    .tab-btn.active .tab-dot { opacity: 1; }
-    .tab-btn[data-phase="1"] .tab-dot { background: var(--p1); }
-    .tab-btn[data-phase="2"] .tab-dot { background: var(--p2); }
-    .tab-btn[data-phase="3"] .tab-dot { background: var(--p3); }
-    .tab-btn[data-phase="4"] .tab-dot { background: var(--p4); }
-    .tab-btn[data-phase="1"].active { color: var(--p1); border-bottom-color: var(--p1); }
-    .tab-btn[data-phase="2"].active { color: var(--p2); border-bottom-color: var(--p2); }
-    .tab-btn[data-phase="3"].active { color: var(--p3); border-bottom-color: var(--p3); }
-    .tab-btn[data-phase="4"].active { color: var(--p4); border-bottom-color: var(--p4); }
-
     /* ── PAGE LAYOUT ─────────────────────────────────────────────── */
-    .page { display: none; }
-    .page.active {
-      display: block;
-      animation: fadeUp 0.35s var(--tr) both;
-    }
+    .page { display: block; }
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(16px); }
       to   { opacity: 1; transform: translateY(0); }
@@ -401,23 +357,7 @@
   </div>
 </section>
 
-<!-- ── TABS ──────────────────────────────────────────────────────── -->
-<div class="tabs-wrap">
-  <div class="tabs">
-    <button class="tab-btn active" data-phase="1" onclick="showPage('phase1',this)">
-      <span class="tab-dot"></span>Phase 1 — Pre-Renewal &amp; Awareness
-    </button>
-    <button class="tab-btn" data-phase="2" onclick="showPage('phase2',this)">
-      <span class="tab-dot"></span>Phase 2 — Eligibility &amp; Assessment
-    </button>
-    <button class="tab-btn" data-phase="3" onclick="showPage('phase3',this)">
-      <span class="tab-dot"></span>Phase 3 — Application &amp; Processing
-    </button>
-    <button class="tab-btn" data-phase="4" onclick="showPage('phase4',this)">
-      <span class="tab-dot"></span>Phase 4 — Post-Renewal &amp; Incentives
-    </button>
-  </div>
-</div>
+<!-- ── CONTINUOUS SINGLE PAGE ──────────────────────────────────── -->
 
 <!-- ══════════════════════════════════════════════════════════════ -->
 <!--  PHASE 1 — Blue                                               -->
@@ -565,7 +505,7 @@
 <!-- ══════════════════════════════════════════════════════════════ -->
 <!--  PHASE 2 — Green                                              -->
 <!-- ══════════════════════════════════════════════════════════════ -->
-<div id="phase2" class="page">
+<div id="phase2" class="page active">
   <div class="phase-wrap">
     <div class="phase-header">
       <div class="phase-icon p2">✅</div>
@@ -704,7 +644,7 @@
 <!-- ══════════════════════════════════════════════════════════════ -->
 <!--  PHASE 3 — Orange                                             -->
 <!-- ══════════════════════════════════════════════════════════════ -->
-<div id="phase3" class="page">
+<div id="phase3" class="page active">
   <div class="phase-wrap">
     <div class="phase-header">
       <div class="phase-icon p3">⚙️</div>
@@ -873,7 +813,7 @@
 <!-- ══════════════════════════════════════════════════════════════ -->
 <!--  PHASE 4 — Purple                                             -->
 <!-- ══════════════════════════════════════════════════════════════ -->
-<div id="phase4" class="page">
+<div id="phase4" class="page active">
   <div class="phase-wrap">
     <div class="phase-header">
       <div class="phase-icon p4">🏆</div>
@@ -1002,16 +942,6 @@
   Philippines 2025 &nbsp;·&nbsp; Interactive Implementation Flow &nbsp;·&nbsp;
   4 Phases &nbsp;·&nbsp; Digital-First · Citizen-Centric
 </footer>
-
-<script>
-  function showPage(pageId, btn) {
-    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
-    document.getElementById(pageId).classList.add('active');
-    if (btn) btn.classList.add('active');
-    window.scrollTo({ top: document.querySelector('.tabs-wrap').offsetTop, behavior: 'smooth' });
-  }
-</script>
 
 </body>
 </html>
